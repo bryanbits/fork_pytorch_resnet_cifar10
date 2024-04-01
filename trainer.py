@@ -78,12 +78,12 @@ def main():
         Path("drive/MyDrive/resnet_trainings/" + args.arch + "/models/").mkdir(parents=True, exist_ok=True)
         if args.finetune:
             logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(
-                args.num_classes) + "_finetuned_from_up_to_" + str(args.num_classes - 1) + ".log"
+                args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
-                args.num_classes) + "_finetuned_from_up_to_" + str(args.num_classes - 1) + ".pt"
+                args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".pt"
         else:
-            logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes)
-            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes)
+            logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes-1)
+            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes-1)
     else:
         if not os.path.exists(args.save_dir):
             os.makedirs(args.save_dir)
