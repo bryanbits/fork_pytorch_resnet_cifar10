@@ -4,6 +4,7 @@ from torch.utils.data import Dataset, Subset, random_split
 import torchvision.datasets as datasets
 from torchvision.transforms import ToTensor
 
+
 def split_train_val(dataset, val_size=0.2):
     """
     Returns a tuple of train and validation datasets.
@@ -12,6 +13,7 @@ def split_train_val(dataset, val_size=0.2):
     n_val = int(n * val_size)
     n_train = n - n_val
     return random_split(dataset, [n_train, n_val])
+
 
 def get_cifar10_dataset(fpath="data/cifar10", train=True, transform=ToTensor()):
     return datasets.CIFAR10(root=fpath, train=train, download=True, transform=transform)
