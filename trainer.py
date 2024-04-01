@@ -4,6 +4,7 @@ import argparse
 import os
 import shutil
 import time
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -78,10 +79,15 @@ def main():
                 args.num_classes) + "_finetuned_from_up_to_" + str(args.num_classes - 1) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
                 args.num_classes) + "_finetuned_from_up_to_" + str(args.num_classes - 1) + ".pt"
+
+            Path(logpath).mkdir(parents=True, exist_ok=True)
+            Path(savepath).mkdir(parents=True, exist_ok=True)
         else:
             logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes)
-            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
-                args.num_classes)
+            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes)
+
+            Path(logpath).mkdir(parents=True, exist_ok=True)
+            Path(savepath).mkdir(parents=True, exist_ok=True)
     else:
         if not os.path.exists(args.save_dir):
             os.makedirs(args.save_dir)
