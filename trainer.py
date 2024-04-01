@@ -1,3 +1,5 @@
+# TODO: reimplement logging (to a file + to google drive), implement capability to train on 11 classes max (changing model params + label changing)
+
 import argparse
 import os
 import shutil
