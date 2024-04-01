@@ -111,14 +111,14 @@ def main():
 
     transform = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(32, 4), transforms.ToTensor(), normalize])
 
-    unpartitioned_trainset = data.get_cifar10_dataset(fpath="data/cifar10/train", train=True, transform=transform)
+    unpartitioned_trainset = data.get_cifar10_dataset(fpath="./data", train=True, transform=transform)
     train_dataset = data.cifar10_change_labels(list(range(args.num_classes)), unpartitioned_trainset)
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
 
-    unpartitioned_valset = datasets.CIFAR10(root="data/cifar10/test", train=False, download=True, transform=transforms.Compose([transforms.ToTensor(), normalize]))
+    unpartitioned_valset = datasets.CIFAR10(root="./data", train=False, download=True, transform=transforms.Compose([transforms.ToTensor(), normalize]))
     val_datset = data.cifar10_change_labels(list(range(args.num_classes)), unpartitioned_valset)
 
     val_loader = torch.utils.data.DataLoader(
