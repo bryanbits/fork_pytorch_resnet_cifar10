@@ -122,9 +122,10 @@ def main():
         train_dataset,
         batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
 
+    unpartitioned_valset = data.get_cifar10_dataset(fpath="data/cifar10/test", train=False, transform=transforms.Compose([transforms.ToTensor(), normalize]))
+
     val_loader = torch.utils.data.DataLoader(
-        data.cifar10_change_labels(list(range(args.num_classes)),
-                                   datasets.CIFAR10(root='data/cifar10/test', train=False, transform=transforms.Compose([transforms.ToTensor(), normalize]))),
+        data.cifar10_change_labels(list(range(args.num_classes)), unpartitioned_valset),
         batch_size=128, shuffle=False, num_workers=args.workers, pin_memory=True)
 
     # define loss function (criterion) and optimizer
