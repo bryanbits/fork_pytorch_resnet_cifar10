@@ -99,7 +99,7 @@ def main():
             if not args.finetune:
                 args.start_epoch = checkpoint['epoch']
             model.load_state_dict(checkpoint['state_dict'])
-            print("=> loaded checkpoint '{}' (epoch {})"
+            print("=> loaded checkpoint. evaluating: '{}' (epoch {})"
                   .format(args.evaluate, args.start_epoch))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
