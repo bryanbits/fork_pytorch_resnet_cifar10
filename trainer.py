@@ -1,7 +1,10 @@
+# TODO: reimplement logging (to a file + to google drive), implement capability to train on 11 classes max (changing model params + label changing)
+
 import argparse
 import os
 import shutil
 import time
+from pathlib import Path
 
 import torch
 import torch.nn as nn
@@ -13,18 +16,20 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
 
+import data
+
 model_names = sorted(name for name in resnet.__dict__
-    if name.islower() and not name.startswith("__")
+                     if name.islower() and not name.startswith("__")
                      and name.startswith("resnet")
                      and callable(resnet.__dict__[name]))
 
 print(model_names)
 
-parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
+parser = argparse.ArgumentParser(description='Proper ResNets for CIFAR10 in pytorch')
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet32',
                     choices=model_names,
                     help='model architecture: ' + ' | '.join(model_names) +
-                    ' (default: resnet32)')
+                         ' (default: resnet32)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
 parser.add_argument('--epochs', default=200, type=int, metavar='N',
@@ -55,6 +60,12 @@ parser.add_argument('--save-dir', dest='save_dir',
 parser.add_argument('--save-every', dest='save_every',
                     help='Saves checkpoints at every specified number of epochs',
                     type=int, default=10)
+parser.add_argument('--drive', dest='drive', action='store_true',
+                    help='log to google drive')
+parser.add_argument('--num-classes', dest='num_classes',
+                    help='how many classes with a unique label vs. being in the other set', type=int, default=10)
+parser.add_argument('--finetune', dest='finetune', action='store_true',
+                    help='finetune model from pretrained or train from scratch')
 best_prec1 = 0
 
 
@@ -62,24 +73,35 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
-
-    # Check the save_dir exists or not
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+    if args.drive:
+        Path("drive/MyDrive/resnet_trainings/" + args.arch + "/logs/").mkdir(parents=True, exist_ok=True)
+        Path("drive/MyDrive/resnet_trainings/" + args.arch + "/models/").mkdir(parents=True, exist_ok=True)
+        if args.finetune:
+            logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(
+                args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".log"
+            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
+                args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".pt"
+        else:
+            logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes-1) + ".log"
+            savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes-1) + ".pt"
+    else:
+        if not os.path.exists(args.save_dir):
+            os.makedirs(args.save_dir)
 
     model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
     model.cuda()
 
-    # optionally resume from a checkpoint
+    # optionally resume from a checkpoint or prev model when finetuning
     if args.resume:
         if os.path.isfile(args.resume):
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
-            args.start_epoch = checkpoint['epoch']
-            best_prec1 = checkpoint['best_prec1']
+            if not args.finetune:
+                args.start_epoch = checkpoint['epoch']
+                best_prec1 = checkpoint['best_prec1']
             model.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(args.evaluate, checkpoint['epoch']))
+                  .format(args.evaluate, args.start_epoch))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
 
@@ -88,23 +110,21 @@ def main():
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
+    transform = transforms.Compose([transforms.RandomHorizontalFlip(), transforms.RandomCrop(32, 4), transforms.ToTensor(), normalize])
+
+    unpartitioned_trainset = data.get_cifar10_dataset(fpath="./data", train=True, transform=transform)
+    train_dataset = data.cifar10_change_labels(list(range(args.num_classes)), unpartitioned_trainset)
+
     train_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='./data', train=True, transform=transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomCrop(32, 4),
-            transforms.ToTensor(),
-            normalize,
-        ]), download=True),
-        batch_size=args.batch_size, shuffle=True,
-        num_workers=args.workers, pin_memory=True)
+        train_dataset,
+        batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
+
+    unpartitioned_valset = datasets.CIFAR10(root="./data", train=False, download=False, transform=transforms.Compose([transforms.ToTensor(), normalize]))
+    val_datset = data.cifar10_change_labels(list(range(args.num_classes)), unpartitioned_valset)
 
     val_loader = torch.utils.data.DataLoader(
-        datasets.CIFAR10(root='./data', train=False, transform=transforms.Compose([
-            transforms.ToTensor(),
-            normalize,
-        ])),
-        batch_size=128, shuffle=False,
-        num_workers=args.workers, pin_memory=True)
+        val_datset,
+        batch_size=128, shuffle=False, num_workers=args.workers, pin_memory=True)
 
     # define loss function (criterion) and optimizer
     criterion = nn.CrossEntropyLoss().cuda()
@@ -124,8 +144,7 @@ def main():
         # for resnet1202 original paper uses lr=0.01 for first 400 minibatches for warm-up
         # then switch back. In this setup it will correspond for first epoch.
         for param_group in optimizer.param_groups:
-            param_group['lr'] = args.lr*0.1
-
+            param_group['lr'] = args.lr * 0.1
 
     if args.evaluate:
         validate(val_loader, model, criterion)
@@ -135,30 +154,30 @@ def main():
 
         # train for one epoch
         print('current lr {:.5e}'.format(optimizer.param_groups[0]['lr']))
-        train(train_loader, model, criterion, optimizer, epoch)
+        train(train_loader, model, criterion, optimizer, epoch, logpath)
         lr_scheduler.step()
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion)
+        prec1 = validate(val_loader, model, criterion, epoch, logpath)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
         best_prec1 = max(prec1, best_prec1)
 
-        if epoch > 0 and epoch % args.save_every == 0:
-            save_checkpoint({
-                'epoch': epoch + 1,
-                'state_dict': model.state_dict(),
-                'best_prec1': best_prec1,
-            }, is_best, filename=os.path.join(args.save_dir, 'checkpoint.th'))
+        if is_best:
+            if args.drive:
+                save_checkpoint({
+                    'state_dict': model.state_dict(),
+                    'best_prec1': best_prec1,
+                }, is_best, filename=savepath)
+            else:
+                save_checkpoint({
+                    'state_dict': model.state_dict(),
+                    'best_prec1': best_prec1,
+                }, is_best, filename=os.path.join(args.save_dir, 'model.pt'))
 
-        save_checkpoint({
-            'state_dict': model.state_dict(),
-            'best_prec1': best_prec1,
-        }, is_best, filename=os.path.join(args.save_dir, 'model.th'))
 
-
-def train(train_loader, model, criterion, optimizer, epoch):
+def train(train_loader, model, criterion, optimizer, epoch, logpath):
     """
         Run one train epoch
     """
@@ -202,17 +221,26 @@ def train(train_loader, model, criterion, optimizer, epoch):
         batch_time.update(time.time() - end)
         end = time.time()
 
-        if i % args.print_freq == 0:
-            print('Epoch: [{0}][{1}/{2}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                      epoch, i, len(train_loader), batch_time=batch_time,
-                      data_time=data_time, loss=losses, top1=top1))
+    if args.drive:
+        f = open(logpath, 'a')
+        f.write('Epoch: [{0}]\t'
+                'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+                'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(epoch, batch_time=batch_time, data_time=data_time,
+                                                                loss=losses, top1=top1))
+        f.write("\n")
+        f.close()
+    else:
+        print('Epoch: [{0}]\t'
+              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+              'Data {data_time.val:.3f} ({data_time.avg:.3f})\t'
+              'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+              'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(epoch, batch_time=batch_time, data_time=data_time,
+                                                              loss=losses, top1=top1))
 
 
-def validate(val_loader, model, criterion):
+def validate(val_loader, model, criterion, epoch, logpath):
     """
     Run evaluation
     """
@@ -249,18 +277,22 @@ def validate(val_loader, model, criterion):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0:
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                          i, len(val_loader), batch_time=batch_time, loss=losses,
-                          top1=top1))
-
-    print(' * Prec@1 {top1.avg:.3f}'
-          .format(top1=top1))
+    if args.drive:
+        f = open(logpath, 'a')
+        f.write('Test: [{0}]\t'
+                'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(epoch, batch_time=batch_time, loss=losses, top1=top1))
+        f.write("\n")
+        f.close()
+    else:
+        print('Test: [{0}]\t'
+              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+              'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+              'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(epoch, batch_time=batch_time, loss=losses, top1=top1))
 
     return top1.avg
+
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     """
@@ -268,8 +300,10 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     """
     torch.save(state, filename)
 
+
 class AverageMeter(object):
     """Computes and stores the average and current value"""
+
     def __init__(self):
         self.reset()
 
