@@ -97,7 +97,7 @@ def main():
             print("=> loading checkpoint '{}'".format(args.resume))
             checkpoint = torch.load(args.resume)
             if not args.finetune:
-                args.start_epoch = checkpoint['epoch']
+                best_prec1 = checkpoint['best_prec1']
             model.load_state_dict(checkpoint['state_dict'])
             print("=> loaded checkpoint. evaluating: '{}' (epoch {})"
                   .format(args.evaluate, args.start_epoch))
