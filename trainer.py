@@ -81,7 +81,10 @@ def main():
                 args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
                 args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".pt"
-            model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
+            if args.num_classes == 2:
+                model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_0.pt")
+            else:
+                model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
                 args.num_classes-2) + "_finetuned_from_up_to_" + str(args.num_classes-3) + ".pt")
         else:
             logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes-1) + ".log"
