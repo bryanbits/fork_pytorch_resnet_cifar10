@@ -81,14 +81,17 @@ def main():
                 args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
                 args.num_classes-1) + "_finetuned_from_up_to_" + str(args.num_classes-2) + ".pt"
+            model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
+                args.num_classes-2) + "_finetuned_from_up_to_" + str(args.num_classes-3) + ".pt")
         else:
             logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes-1) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes-1) + ".pt"
+            model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
     else:
         if not os.path.exists(args.save_dir):
             os.makedirs(args.save_dir)
+        model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
 
-    model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
     model.cuda()
 
     # optionally resume from a checkpoint or prev model when finetuning
