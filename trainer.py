@@ -18,6 +18,20 @@ import resnet
 
 import data
 
+
+def get_device():
+    """
+    Device priority: apple silicon (if available) -> cuda (if available) -> cpu
+    """
+    return torch.device(
+        "mps"
+        if torch.backends.mps.is_available()
+        else "cuda:0"
+        if torch.cuda.is_available()
+        else "cpu"
+    )
+
+
 model_names = sorted(name for name in resnet.__dict__
                      if name.islower() and not name.startswith("__")
                      and name.startswith("resnet")
@@ -95,7 +109,8 @@ def main():
             os.makedirs(args.save_dir)
         model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
 
-    model.cuda()
+    device = get_device()
+    model.to(device)
 
     # optionally resume from a checkpoint or prev model when finetuning
     if args.resume:
