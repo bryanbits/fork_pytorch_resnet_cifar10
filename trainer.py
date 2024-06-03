@@ -18,20 +18,6 @@ import resnet
 
 import data
 
-
-def get_device():
-    """
-    Device priority: apple silicon (if available) -> cuda (if available) -> cpu
-    """
-    return torch.device(
-        "mps"
-        if torch.backends.mps.is_available()
-        else "cuda:0"
-        if torch.cuda.is_available()
-        else "cpu"
-    )
-
-
 model_names = sorted(name for name in resnet.__dict__
                      if name.islower() and not name.startswith("__")
                      and name.startswith("resnet")
@@ -98,8 +84,7 @@ def main():
             if args.num_classes == 2:
                 model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_0.pt")
             else:
-                model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(
-                args.num_classes-2) + "_finetuned_from_up_to_" + str(args.num_classes-3) + ".pt")
+                model = torch.load("drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes-2) + "_finetuned_from_up_to_" + str(args.num_classes-3) + ".pt")
         else:
             logpath = "drive/MyDrive/resnet_trainings/" + args.arch + "/logs/classifies_up_to_" + str(args.num_classes-1) + ".log"
             savepath = "drive/MyDrive/resnet_trainings/" + args.arch + "/models/classifies_up_to_" + str(args.num_classes-1) + ".pt"
@@ -108,9 +93,7 @@ def main():
         if not os.path.exists(args.save_dir):
             os.makedirs(args.save_dir)
         model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
-
-    device = get_device()
-    model.to(device)
+        model.cuda()
 
     # optionally resume from a checkpoint or prev model when finetuning
     if args.resume:
