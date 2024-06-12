@@ -159,7 +159,7 @@ def main():
         lr_scheduler.step()
 
         # evaluate on validation set
-        prec1 = validate(val_loader, model, criterion, epoch, logpath)
+        prec1 = validate_while_training(val_loader, model, criterion, epoch, logpath)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -241,7 +241,7 @@ def train(train_loader, model, criterion, optimizer, epoch, logpath):
                                                               loss=losses, top1=top1))
 
 
-def validate(val_loader, model, criterion, epoch, logpath):
+def validate_while_training(val_loader, model, criterion, epoch, logpath):
     """
     Run evaluation
     """
@@ -291,6 +291,57 @@ def validate(val_loader, model, criterion, epoch, logpath):
               'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
               'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
               'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(epoch, batch_time=batch_time, loss=losses, top1=top1))
+
+    return top1.avg
+
+
+def validate(val_loader, model, criterion):
+    """
+    Run evaluation
+    """
+    batch_time = AverageMeter()
+    losses = AverageMeter()
+    top1 = AverageMeter()
+
+    # switch to evaluate mode
+    model.eval()
+
+    end = time.time()
+    with torch.no_grad():
+        for i, (input, target) in enumerate(val_loader):
+            target = target.cuda()
+            input_var = input.cuda()
+            target_var = target.cuda()
+
+            if args.half:
+                input_var = input_var.half()
+
+            # compute output
+            output = model(input_var)
+            loss = criterion(output, target_var)
+
+            output = output.float()
+            loss = loss.float()
+
+            # measure accuracy and record loss
+            prec1 = accuracy(output.data, target)[0]
+            losses.update(loss.item(), input.size(0))
+            top1.update(prec1.item(), input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                print('Test: [{0}/{1}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                          i, len(val_loader), batch_time=batch_time, loss=losses,
+                          top1=top1))
+
+    print(' * Prec@1 {top1.avg:.3f}'
+          .format(top1=top1))
 
     return top1.avg
 
